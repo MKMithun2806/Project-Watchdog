@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  watchdog-ui:
+    build: .
+    container_name: watchdog_ui
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_THEME_BASE=dark
+      - TZ=Asia/Kolkata
+    volumes:
+      - /path/to/ur/folder/where/u/want/notes:/data
+      - /path/to/dashboard/app.py:/app/app.py
+      - same/path/u/used/to/save/watchdog/reports:/reports:ro

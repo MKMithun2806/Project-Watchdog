@@ -1,0 +1,23 @@
+#!/bin/bash
+TARGET=$1
+
+# Validation: Ensure a target was provided
+if [ -z "$TARGET" ]; then
+  echo "Usage: aws-scan <domain.com>"
+  exit 1
+fi
+
+# The Master Command
+# We use double quotes for user-data so $TARGET is injected correctly
+aws ec2 run-instances \
+--region ap-south-2 \
+--image-id <ami-YourAMI \
+--instance-type t3.small \
+--iam-instance-profile Name=Your-IAM-to-acess-s3 \
+--instance-market-options '{"MarketType":"spot"}' \
+--instance-initiated-shutdown-behavior terminate \
+--user-data "#!/bin/bash
+/usr/local/bin/recon-worker.sh $TARGET >> /var/log/recon-execution.log 2>&1" > /dev/null 2>&1
+
+echo "[+] AWS Recon Worker launched for: $TARGET"
+echo "[+] Results will be uploaded to S3 upon completion."

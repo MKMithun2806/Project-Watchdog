@@ -1,0 +1,54 @@
+#!/bin/bash
+
+BUCKET="your bucket name"
+BASE_DEST="path/to/ur/folder"
+
+# 1. Get latest target folder
+LATEST_FOLDER=$(aws s3 ls s3://$BUCKET/ | sort | tail -n 1 | awk '{print $2}')
+if [ -z "$LATEST_FOLDER" ]; then echo "No scans found."; exit 1; fi
+
+DOMAIN_NAME=${LATEST_FOLDER%/}
+FULL_DEST="$BASE_DEST/$DOMAIN_NAME"
+
+echo "[*] Syncing $DOMAIN_NAME to NAS..."
+mkdir -p "$FULL_DEST"
+aws s3 sync "s3://$BUCKET/$LATEST_FOLDER" "$FULL_DEST"
+
+# 2. Extract and Cleanup Local Files
+DOWNLOAD_SUCCESS=false
+for f in "$FULL_DEST"/*.tar.gz; do
+    if [ -f "$f" ]; then
+        echo "[*] Extracting and cleaning configs..."
+        tar -xzvf "$f" -C "$FULL_DEST"
+        rm "$f"
+        
+        # Delete tool-specific sub-folders (config junk)
+        find "$FULL_DEST" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+        
+        echo "[+] Local cleanup complete."
+        
+        # 3. AUTO-COMBINE FOR AI
+        if command -v comb &> /dev/null; then
+            echo "[*] Triggering auto-combine..."
+            comb "$FULL_DEST"
+        else
+            echo "[!] Warning: 'comb' command not found."
+        fi
+        
+        DOWNLOAD_SUCCESS=true
+        break
+    fi
+done
+
+# 4. Delete from S3 (The Burn) and Final Output
+if [ "$DOWNLOAD_SUCCESS" = true ]; then
+    echo "[*] Deleting source folder from S3..."
+    aws s3 rm "s3://$BUCKET/$LATEST_FOLDER" --recursive
+    
+    echo "[ SUCCESS ] Loot secured at $FULL_DEST and S3 cleared."
+    # The specific line for n8n to grab:
+    echo "Combined file: /path/to/ur/folder/combined/${DOMAIN_NAME}.txt"
+else
+    echo "[-] Download failed or no archive found."
+    exit 1
+fi

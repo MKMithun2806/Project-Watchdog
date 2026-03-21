@@ -1,0 +1,278 @@
+{
+  "name": "Aws recon scanner v5 md",
+  "nodes": [
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        -1696
+      ],
+      "id": "d7f3bdf8-f185-467b-8947-ef1907baff9a",
+      "name": "Wait",
+      "webhookId": "WEBHOOK_ID_PLACEHOLDER"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3a4049bd-8e4b-4f48-b157-bc927014d42f",
+              "leftValue": "={{ $json.stdout}}",
+              "rightValue": "No scans found.",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -176,
+        -1712
+      ],
+      "id": "1bf597e2-47b4-48b3-8787-15618cfe5f32",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "amount": 45
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        -1648
+      ],
+      "id": "7e772cc4-492a-478a-9f2d-b1f34480a063",
+      "name": "Wait1",
+      "webhookId": "WEBHOOK_ID_PLACEHOLDER"
+    },
+    {
+      "parameters": {
+        "command": "aws-scan-download"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        -1696
+      ],
+      "id": "5cc99fc6-5a5a-4951-8815-679cd8db1bc6",
+      "name": "Get Scan Results",
+      "credentials": {
+        "sshPassword": "SSH_CREDENTIAL_PLACEHOLDER"
+      }
+    },
+    {
+      "parameters": {
+        "model": "MODEL_PLACEHOLDER",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        496,
+        -1664
+      ],
+      "id": "2cca20fd-5b66-4558-ba65-315c6f24eae5",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": "API_KEY_PLACEHOLDER"
+      }
+    },
+    {
+      "parameters": {
+        "command": "=aws-scan {{ $json.target }}"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -864,
+        -1696
+      ],
+      "id": "affa6c0f-2375-41d1-b123-5c72aaca8e22",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": "SSH_CREDENTIAL_PLACEHOLDER"
+      }
+    },
+    {
+      "parameters": {
+        "path": "scan",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        -1952
+      ],
+      "id": "d1bf0803-32b3-4370-b2fd-acf50a8d06e2",
+      "name": "Webhook",
+      "webhookId": "WEBHOOK_ID_PLACEHOLDER"
+    },
+    {
+      "parameters": {
+        "command": "= cat \"{{$json.target}}.txt\"",
+        "cwd": "LOCAL_PATH_PLACEHOLDER"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        256,
+        -1888
+      ],
+      "id": "cba6cdae-d68d-488d-a3f0-9c7be4374ce8",
+      "name": "Execute a command1",
+      "credentials": {
+        "sshPassword": "SSH_CREDENTIAL_PLACEHOLDER"
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        32,
+        -1888
+      ],
+      "id": "9d5ab67b-1284-4cb4-885e-3f5084ca3341",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "PROMPT_TEMPLATE_PLACEHOLDER",
+        "needsFallback": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        672,
+        -1888
+      ],
+      "id": "74d954f0-92a1-47c5-a097-d8a9ee373b03",
+      "name": "Basic LLM Chain",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        704,
+        -1648
+      ],
+      "id": "870cf582-f9fb-4b2d-999f-ab504f438320",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": "API_KEY_PLACEHOLDER"
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -1888
+      ],
+      "id": "2d6e4ded-9be2-4e34-bb2b-6894d0f3111f",
+      "name": "Limit1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "89352923-7e1b-4b00-a75a-90a430eef551",
+              "name": "target",
+              "value": "={{ $json.query.target }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1088,
+        -1952
+      ],
+      "id": "845c2b5e-79b6-4467-a016-c6e89f5e0533",
+      "name": "Regex"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "text",
+        "options": {
+          "fileName": "={{ $node[\"Regex\"].json.target }}.md"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        976,
+        -1888
+      ],
+      "id": "b685b3d7-eb31-45d1-a607-41d7c1d5517d",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "path": "NAS_TARGET_PATH_PLACEHOLDER",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        -1904
+      ],
+      "id": "3efa23fd-da0a-4856-aea4-8f176999841d",
+      "name": "Upload a file",
+      "credentials": {
+        "sshPassword": "SSH_CREDENTIAL_PLACEHOLDER"
+      }
+    }
+  ],
+  "connections": "UNCHANGED_FROM_ORIGINAL",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "SANITIZED_VERSION_PLACEHOLDER",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "SANITIZED_INSTANCE_PLACEHOLDER"
+  },
+  "id": "SANITIZED_ID_PLACEHOLDER",
+  "tags": []
+}

@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Check if a directory was provided
+if [ -z "$1" ]; then
+    echo "Usage: comb <path_to_folder>"
+    exit 1
+fi
+
+# Setup paths
+SOURCE_DIR=$(realpath "$1")
+TARGET_NAME=$(basename "$SOURCE_DIR")
+COMBINED_DIR="/path/to/ur/folder/combined"
+OUTPUT_FILE="$COMBINED_DIR/${TARGET_NAME}.txt"
+
+# Check if source directory exists
+if [ ! -d "$SOURCE_DIR" ]; then
+    echo "[-] Error: Directory $SOURCE_DIR does not exist."
+    exit 1
+fi
+
+# Create the combined folder if it doesn't exist
+mkdir -p "$COMBINED_DIR"
+
+echo "[*] Combining files from $TARGET_NAME into $OUTPUT_FILE..."
+
+# Clear/Create the output file
+echo "### RECON AGGREGATION: $TARGET_NAME ###" > "$OUTPUT_FILE"
+echo "Generated: $(date)" >> "$OUTPUT_FILE"
+
+# Loop through all files in the source directory
+for file in "$SOURCE_DIR"/*; do
+    # Only process files, skip directories, and ignore any existing combined files
+    if [ -f "$file" ]; then
+        echo -e "\n\n========================================" >> "$OUTPUT_FILE"
+        echo " SOURCE: $(basename "$file")" >> "$OUTPUT_FILE"
+        echo -e "========================================\n" >> "$OUTPUT_FILE"
+        cat "$file" >> "$OUTPUT_FILE"
+    fi
+done
+
+echo "[SUCCESS] Scan context packed! Ready for AI at: $OUTPUT_FILE"
