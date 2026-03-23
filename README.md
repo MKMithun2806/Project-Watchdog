@@ -1,6 +1,6 @@
 <img width="160" height="160" alt="image" src="https://github.com/user-attachments/assets/c0e75e3b-fae3-4748-b127-69f9aa33188d" />
 
-###Project Watchdog
+##Project Watchdog
 
 Project Watchdog is a **fully automated cloud-native reconnaissance and reporting pipeline** built for red-team operators, penetration testers, and cybersecurity enthusiasts. It’s designed to run scans, fetch results, generate structured reports, and store them—all automatically. Think of it as your own elite red-team assistant.
 
