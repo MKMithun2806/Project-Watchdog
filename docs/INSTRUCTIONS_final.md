@@ -23,8 +23,8 @@ project-watchdog/
 Project Watchdog uses custom AWS scan scripts: aws-scan, aws-scan-download and comb.  
 They are in the *aws-config* folder ```bash
 copy all of them to /usr/local/bin
-``` and don’t forget to change all placeholders in the custom CLI tools to your credentials.
-
+and don’t forget to change all placeholders in the custom CLI tools to your credentials.```
+And copy recon-worker.sh to the aws golden image
 ---
 
 # SSH Credentials
