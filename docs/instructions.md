@@ -20,6 +20,7 @@ Inside it, create:
   - inside docs, create a folder called reports  
 - n8n-workflows → automation files  
 
+If u clone this this shud alrdy exits brw
 ---
 
 # ⚙️ Step 2: AWS Scan Tools Setup
