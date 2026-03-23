@@ -47,7 +47,7 @@ with col_ctrl:
             if target_input:
                 try:
                     safe_target = quote(target_input)
-                    webhook_url = f"http://<urip>:5678/webhook/scan?target={safe_target}"
+                    webhook_url = f"http://192.168.1.15:5678/webhook/scan?target={safe_target}"
                     response = requests.get(webhook_url) 
                     st.toast("Pipeline Active" if response.status_code == 200 else "Uplink Failed")
                 except:
