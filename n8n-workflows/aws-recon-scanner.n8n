@@ -1,0 +1,301 @@
+{
+  "name": "Aws recon scanner v5 md",
+  "nodes": [
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-640, -1696],
+      "id": "d7f3bdf8-f185-467b-8947-ef1907baff9a",
+      "name": "Wait",
+      "webhookId": "YOUR_WEBHOOK_ID_1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3a4049bd-8e4b-4f48-b157-bc927014d42f",
+              "leftValue": "={{ $json.stdout}}",
+              "rightValue": "No scans found.",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-176, -1712],
+      "id": "1bf597e2-47b4-48b3-8787-15618cfe5f32",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "amount": 45
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [32, -1648],
+      "id": "7e772cc4-492a-478a-9f2d-b1f34480a063",
+      "name": "Wait1",
+      "webhookId": "YOUR_WEBHOOK_ID_2"
+    },
+    {
+      "parameters": {
+        "command": "aws-scan-download "
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [-416, -1696],
+      "id": "5cc99fc6-5a5a-4951-8815-679cd8db1bc6",
+      "name": "Get Scan Results",
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_SSH_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=aws-scan {{ $json.target }}"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [-864, -1696],
+      "id": "affa6c0f-2375-41d1-b123-5c72aaca8e22",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_SSH_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "scan",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-1312, -1952],
+      "id": "d1bf0803-32b3-4370-b2fd-acf50a8d06e2",
+      "name": "Webhook",
+      "webhookId": "YOUR_WEBHOOK_ID_3"
+    },
+    {
+      "parameters": {
+        "command": "= cat \"{{$json.target}}.txt\"",
+        "cwd": "/mnt/NAS/targets/combined"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [256, -1888],
+      "id": "cba6cdae-d68d-488d-a3f0-9c7be4374ce8",
+      "name": "Execute a command1",
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_SSH_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [32, -1888],
+      "id": "9d5ab67b-1284-4cb4-885e-3f5084ca3341",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### SYSTEM ROLE: ELITE ATTACK PATH ANALYZER (VERIFIED ONLY)\n\nYou are an elite Red Team Attack Path Analyzer. You ingest raw reconnaissance data (Nmap, Nikto, etc.) and synthesize a lethal exploitation strategy. Your output must be strictly Markdown-formatted, clinical, and infused with dry red-team swagger.\n\n---\n\n### ANTI-HALLUCINATION PROTOCOL (CRITICAL)\n1. ONLY use information explicitly present in the provided logs.\n2. DO NOT invent versions, CVEs, or subdomains not listed in the input.\n3. If a service is found but no known exploit exists in your training data for that specific version, label it as \"Requires Manual Enumeration\" rather than guessing.\n4. If the input is insufficient to build a path, state: \"INSUFFICIENT DATA FOR PATH CONSTRUCTION.\"\n\n---\n\n### OUTPUT RULES\n1. START with a cynical, sarcastic blockquote about the target's security posture.\n2. USE ```bash for all command blocks and ``` for closing.\n3. PRIORITIZE paths by \"Ease of Shell.\"\n4. GENERATE a multi-stage Mermaid map showing the potential blast radius.\n\n---\n\n### THE ANALYSIS ARCHITECTURE\n\n> \"<Cynical/sarcastic opening quote regarding specific findings.>\"\n\n## TARGET IDENT: <IP/Hostname>\n* **Assessed OS:** <OS Guess/Verified>\n* **Verified Surface:** <List top exposures found in logs>\n\n## THE KILL CHAIN (Prioritized Paths)\n\n### Path 1: <Exploit Name / CVE>\n* **Vector:** Port <XX> (<Service>)\n* **Evidence:** <Quote the specific log line that proves this vulnerability>\nIf a direct exploit (RCE/LFI/Auth Bypass) exists, list it.\nIf NOT, Path 1 must be the \"High-Probability Probe\".\nThe Mechanism: Explain exactly what bit of info we are missing to turn this into a shell.\n* **Execution:**\n```bash\n<exact terminal command for exploitation>\n```\n* **Outcome:** <RCE / Creds / LFI / Root>\n\n## WEB SURFACE (NIKTO/HTTP)\n*Only if Port 80/443 logs are provided*\n* **Stack:** <Frameworks/Headers/Server info>\n* **Exposed Assets:** <List specific paths found>\n* **Web Probe:**\n```bash\n<targeted ffuf or sqlmap command>\n```\n\n## TARGET TOPOLOGY AND POST-EXPLOIT MAP\nIn the Mermaid map, always label the nodes with the Service Name AND Version to ensure the blast radius is technically accurate.\nCRITICAL MERMAID SYNTAX RULES - STRICTLY FOLLOW:\n- No emoji anywhere in the graph block\n- No special characters inside node labels [] or {} or (())\n- Forbidden characters inside labels: ( ) [ ] { } < > \" / \\ # | & %\n- Replace ALL of the above with dashes or plain words\n  Bad:  Apache[Apache 2.4.62 (Amazon Linux)]\n  Good: Apache[Apache 2.4.62 - Amazon Linux]\n  Bad:  V1{CVE-2021-39433 (LFI/RCE)}\n  Good: V1{CVE-2021-39433 - LFI}\n  Bad:  Path[/etc/passwd disclosed]\n  Good: Path[etc-passwd disclosed]\n  Bad:  Node[Auth \"bypass\" found]\n  Good: Node[Auth bypass found]\n- Node IDs must be alphanumeric + underscores only. No dashes.\n  Bad:  CVE-2021-39433{...}  ELB-443[awselb]\n  Good: CVE_2021_39433{...}  ELB_443[awselb]\n```mermaid\ngraph LR\n    Attacker[Operator] -->|Initial Breach| Target((Target IP))\n    Target -->|Port XX| S1[Service Name]\n    Target -->|Port YY| S2[Service Name]\n    S1 -.-> V1{Vulnerability 1}\n    S2 -.-> V2{Vulnerability 2}\n    V1 --> Post[Shell Gained]\n    Post --> Lateral[Internal Network Scan]\n    Lateral --> Exfil[Data Exfiltration]\n    style Attacker fill:#8b0000,stroke:#ff0000,color:#fff\n    style Target fill:#111,stroke:#00ff00,color:#00ff00\n    style V1 fill:#ff8c00,stroke:#fff,color:#000\n    style Post fill:#4b0082,stroke:#fff,color:#fff\n    style Exfil fill:#00008b,stroke:#00ffff,color:#fff\n```\n\n**Now, analyze the following raw pipeline logs and generate the strategy:**\n{{ $json.stdout }}",
+        "needsFallback": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [672, -1888],
+      "id": "74d954f0-92a1-47c5-a097-d8a9ee373b03",
+      "name": "Basic LLM Chain",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [464, -1888],
+      "id": "2d6e4ded-9be2-4e34-bb2b-6894d0f3111f",
+      "name": "Limit1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "89352923-7e1b-4b00-a75a-90a430eef551",
+              "name": "target",
+              "value": "={{ $json.query.target }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-848, -1952],
+      "id": "845c2b5e-79b6-4467-a016-c6e89f5e0533",
+      "name": "Regex"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "text",
+        "options": {
+          "fileName": "={{ $node[\"Regex\"].json.target }}.md"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [976, -1888],
+      "id": "b685b3d7-eb31-45d1-a607-41d7c1d5517d",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "path": "/mnt/NAS/targets/AiSummaries",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1136, -1904],
+      "id": "3efa23fd-da0a-4856-aea4-8f176999841d",
+      "name": "Upload a file",
+      "credentials": {
+        "sshPassword": {
+          "id": "YOUR_SSH_CREDENTIAL_ID",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [560, -1680],
+      "id": "8675848f-fe0e-462f-a1b5-bdb2b5ef6b6f",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [896, -1648],
+      "id": "c7d98523-9431-422c-a835-ad4d19ea4aed",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "YOUR_OPENROUTER_CREDENTIAL_ID",
+          "name": "OpenRouter account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait": {
+      "main": [[{"node": "Get Scan Results", "type": "main", "index": 0}]]
+    },
+    "If": {
+      "main": [
+        [{"node": "Wait1", "type": "main", "index": 0}],
+        [{"node": "Merge1", "type": "main", "index": 1}]
+      ]
+    },
+    "Wait1": {
+      "main": [[{"node": "Get Scan Results", "type": "main", "index": 0}]]
+    },
+    "Get Scan Results": {
+      "main": [[{"node": "If", "type": "main", "index": 0}]]
+    },
+    "Execute a command": {
+      "main": [[{"node": "Wait", "type": "main", "index": 0}]]
+    },
+    "Webhook": {
+      "main": [[{"node": "Regex", "type": "main", "index": 0}]]
+    },
+    "Execute a command1": {
+      "main": [[{"node": "Limit1", "type": "main", "index": 0}]]
+    },
+    "Merge1": {
+      "main": [[{"node": "Execute a command1", "type": "main", "index": 0}]]
+    },
+    "Basic LLM Chain": {
+      "main": [[{"node": "Convert to File", "type": "main", "index": 0}]]
+    },
+    "Limit1": {
+      "main": [[{"node": "Basic LLM Chain", "type": "main", "index": 0}]]
+    },
+    "Regex": {
+      "main": [[
+        {"node": "Execute a command", "type": "main", "index": 0},
+        {"node": "Merge1", "type": "main", "index": 0}
+      ]]
+    },
+    "Convert to File": {
+      "main": [[{"node": "Upload a file", "type": "main", "index": 0}]]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [[{"node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0}]]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [[{"node": "Basic LLM Chain", "type": "ai_languageModel", "index": 1}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "YOUR_VERSION_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "YOUR_WORKFLOW_ID",
+  "tags": []
+}

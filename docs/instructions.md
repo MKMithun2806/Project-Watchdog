@@ -62,7 +62,7 @@ echo -e "\033[0;32m[+] Worker Stack Installed. Subfinder, HTTPX, Naabu, and Nucl
 ---
 
 # 🔄 Step 4: n8n Automation
-1. **Import:** Load `aws-recon-v5.json` into n8n.
+1. **Import:** Load `aws-recon-scanner.json` into n8n.
 2. **Credentials:** Link your SSH (to C2) and AI (OpenRouter/Gemini) keys.
 3. **Launch:** Trigger the webhook with a target IP. The worker will launch, scan, upload to S3, and then **self-terminate** with `sudo shutdown -h now`.
 
