@@ -1,100 +1,81 @@
-## Project Watchdog
+# 🐶 Project Watchdog: The Ghost Recon Pipeline
 
-Project Watchdog is a **fully automated cloud-native reconnaissance and reporting pipeline** built for red-team operators, penetration testers, and cybersecurity enthusiasts. It’s designed to run scans, fetch results, generate structured reports, and store them—all automatically. Think of it as your own elite red-team assistant.
+> "Recon shouldn't take your time. It should take the target's peace of mind."
+
+Project Watchdog is a **fully automated, cloud-native reconnaissance engine**. It orchestrates temporary AWS Spot instances to perform high-compute scans, processes the logs, and uses an **AI Attack Path Analyzer** to tell you exactly how to breach the target. 
+
+It doesn’t just scan; it thinks.
 
 ---
 
-## 🚀 Features
+## ⚡ The "Watchdog" Workflow
 
-- **Automated AWS scanning** via SSH + CLI (`aws-scan`, `aws-scan-download`)  
-- **Webhook-triggered scans** for dynamic targets  
-- **Retry logic** with `Wait + If` nodes for failed or empty scans  
-- **Structured AI report generation** using OpenRouter or Google Gemini models  
-- **Markdown report output** ready for GitHub, Obsidian, Notion, Discord, and web dashboards  
-- **Automated upload** to a NAS or remote storage  
-- **Multi-folder project organization** (frontend, cloud scripts, backups, workflows)
+```mermaid
+graph LR
+    A[🎯 Webhook Trigger] --> B[🧠 n8n Controller]
+    B --> C[☁️ AWS Spot Fleet]
+    C --> D[🛠️ Parallel Recon: Subfinder/Nuclei/Nmap]
+    D --> E[📦 S3 Data Dump]
+    E --> F[🤖 AI Attack Path Analyzer]
+    F --> G[📝 Final Report: docs/reports/]
+    G --> H[🐚 Self-Destruct: Worker Terminated]
+    
+    style C fill:#f96,stroke:#333,stroke-width:2px
+    style F fill:#69f,stroke:#333,stroke-width:2px
+    style H fill:#f66,stroke:#333,stroke-width:2px
+```
+
+---
+
+## 🚀 Why Watchdog?
+
+* **Ghost Infrastructure:** Launches **Golden AMIs** on AWS Spot instances. They scan and then commit digital suicide (`shutdown -h now`) to save costs and leave no trace.
+* **AI-Powered Lethality:** Uses a custom **Red-Team Swagger** prompt (OpenRouter/Gemini) to turn messy Nmap/Nikto logs into a prioritized Kill Chain.
+* **Infinite Scalability:** Trigger 1 or 100 scans via a simple REST API/Webhook.
+* **Persistence:** Automatically syncs results to your local NAS or Raspberry Pi homelab.
 
 ---
 
 ## 🗂️ Repo Structure
 
+```text
 project-watchdog/
-├─ workflows/          # n8n workflow JSON files
-│   └─ aws-recon-v5.json
-├─ docs/               # Instructions, architecture, notes
-│   └─ instructions.md
-├─ aws-config/         # Copied AWS CLI & scan binaries (safe placeholders)
-├─ examples/           # Sample generated reports
-│   └─ sample-report.md
-└─ README.md           # This file
+├─ workflows/          # The n8n "Brain" (.json blueprints)
+├─ aws-config/         # C2 Scripts (aws-scan, recon-worker.sh)
+├─ docs/               # The "Hitman" Setup Guide
+├─ examples/           # Sample AI-generated "Kill Chain" reports
+└─ README.md           # You are here.
+```
 
 ---
 
-## ⚙️ How It Works
+## ⚙️ Core Mechanics
 
-1. **Trigger a scan:** Send a request to the n8n Webhook (`/scan?target=<IP/hostname>`).  
-2. **Execute scan:** SSH nodes run AWS scan commands on the target.  
-3. **Wait & Retry:** If no scans found, the workflow waits and retries automatically.  
-4. **Fetch results:** Grab the scan outputs from your NAS or local storage.  
-5. **Generate report:** AI nodes (OpenRouter / Google Gemini) produce a structured markdown report.  
-6. **Convert & upload:** Report is saved as a `.md` file and optionally uploaded to remote storage.
-
----
-
-## 🔒 Security Notes
-
-- **Credentials are placeholders** in this repo. Before running:
-  - Add your SSH credentials for servers
-  - Add your API keys for AI models
-- **Paths are placeholders** (`NAS_TARGET_PATH_PLACEHOLDER`)—update to your environment
-- **Input validation is highly recommended** if exposing the webhook publicly
-- Never include production secrets when publishing
-
----
-
-## 📄 Instructions
-
-Full setup instructions, environment variables, and dependencies are in:
-
-[docs/instructions.md](docs/instructions.md)
-
----
-
-## 📝 Examples
-
-All generated reports are stored in the `docs/reports/` folder.  
-
-project-watchdog/docs/reports/
-├─ 16.112.122.75.md
-├─ 18.60.211.33.md
-├─ demo.testfire.net.md
-├─ juice-shop.herokuapp.com.md
-├─ nmap.scanme.org.md
+1.  **The Trigger:** A POST request to `/scan?target=example.com`.
+2.  **The Muscle:** n8n SSH's into your C2, which boots a pre-configured AWS Worker.
+3.  **The Extraction:** Worker uploads a compressed `.zip` of Nmap, Nikto, and Nuclei results to S3.
+4.  **The Intelligence:** n8n pulls the logs, feeds them to the **Attack Path Analyzer**, and generates a Markdown report with a Mermaid topology map.
+5.  **The Clean-up:** The AWS Worker terminates. Total cost per scan: ~$0.02.
 
 ---
 
 ## 🛠️ Requirements
 
-- **n8n** v2.x  
-- **Node.js** v18+  
-- **SSH access** to scanning servers  
-- **AWS CLI & scan scripts** (`aws`, `aws-scan`, `aws-scan-download`)  
-- **Optional AI account:** OpenRouter / Google Gemini (PaLM) API keys
+* **n8n** (Self-hosted or Cloud)
+* **AWS Account** (For the Spot Instance fleet)
+* **OpenRouter or Gemini API Key** (For the "Watchdog Brain")
+* **A hunger for automation.**
 
 ---
 
-## 🧠 Tips
+## 📄 Documentation
 
-- Keep workflows organized in `workflows/`  
-- Store generated reports in `examples/` or NAS paths  
-- Update environment placeholders before running  
-- Test webhooks locally before exposing publicly
+Ready to deploy? Follow the **[Actually Human-Friendly Setup Guide](docs/instructions.md)**.
 
 ---
-## What next
-Im still working on it but trust me ppl after i finish this will becom project watchGOD
+
+## 📌 Disclaimer
+*Project Watchdog is for authorized security auditing and educational purposes only. Don't be a villain; be a Watchdog.*
+
 ---
-
-## 📌 License
-
-MIT License — feel free to fork, tweak, and use for.. Ethical purposes.
+**Status:** In Active Development 🛠️ | **Goal:** Project WatchGOD

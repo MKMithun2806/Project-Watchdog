@@ -1,287 +1,79 @@
-# 🐶 Project Watchdog — Setup Guide (Actually Human-Friendly)
+# Project Watchdog — Setup Guide (The Hitman Infrastructure)
 
-This guide helps you set up everything from scratch so your pipeline works like this:
+> "Because manually running Nmap in 2026 is like bringing a knife to a drone fight. Automate or stay a script kiddie."
 
-scan → process → AI report → auto saved
+This guide helps you build an automated recon pipeline: **Scan → Process → AI Analysis → Auto-Save.**
 
 ---
 
 # 🧱 Step 1: Project Structure
+Create a folder called `project-watchdog`. Inside it, you need this tree:
 
-Create a folder called:
-
-project-watchdog
-
-Inside it, create:
-
-- aws-config → your scan tools  
-- dashboard → optional frontend  
-- docs → documentation + reports  
-  - inside docs, create a folder called reports  
-- n8n-workflows → automation files  
-
-If u clone this this shud alrdy exits brw
----
-
-# ⚙️ Step 2: AWS Scan Tools Setup
-
-Go into aws-config. You should have:
-
-- aws-scan  
-- aws-scan-download  
-- comb  
-- recon-worker.sh  
-
-Now:
-
-1. Make these tools usable globally (so they can run from anywhere)
-2. Edit each file and replace:
-   - AWS access key  
-   - secret key  
-   - region  
-
-3. recon-worker.sh will be used inside your AWS machine (we’ll set that up soon)
+- **aws-config** → Your C2 controllers and scan scripts.
+- **dashboard** → Optional Streamlit frontend.
+- **docs/reports** → Where the AI drops the lethal truth.
+- **n8n-workflows** → Your `.json` automation blueprints.
 
 ---
 
-# 🔐 Step 3: SSH Setup
+# 🕹️ ONE-SHOT: C2 Controller Setup
+Run this on your **Main Server** (the one running n8n) to deploy the folder tree and prep the tools.
 
-You need a machine that n8n can control via SSH.
-
-This can be:
-- your main server  
-- OR a cloud instance  
-
-Make sure:
-- SSH login works  
-- AWS tools are installed there  
-
-n8n = controller  
-SSH machine = executor  
+```bash
+sudo apt update && sudo apt install -y git curl unzip && \
+mkdir -p ~/project-watchdog/{aws-config,dashboard,docs/reports,n8n-workflows} && \
+cd ~/project-watchdog/aws-config && \
+touch aws-scan aws-scan-download comb recon-worker.sh && \
+chmod +x * && \
+echo -e "\033[0;32m[+] Infrastructure folder tree deployed.\033[0m" && \
+echo -e "\033[0;33m[!] Action Required: Edit aws-config files with your AWS Secret Keys.\033[0m"
+```
 
 ---
 
-# 🤖 Step 4: AI Setup (for reports)
+# 💀 ONE-SHOT: AWS Worker Setup (The Golden AMI)
+SSH into a fresh **Ubuntu 24.04/22.04** EC2 instance. Paste this to install the full Red-Team stack.
 
-Pick ONE:
-
-### OpenRouter
-- Create API key  
-- Add it in n8n → Credentials  
-
-### Google Gemini
-- Enable API in Google Cloud  
-- Add key in n8n  
-
----
-
-# 🔄 Step 5: Import Workflow
-
-1. Open n8n  
-2. Import aws-recon-v5.json  
-3. Fix all red nodes by adding:
-   - SSH credentials  
-   - AI API key  
-
-All green = ready
+```bash
+sudo apt-get update && sudo apt-get upgrade -y && \
+sudo apt-get install -y git curl unzip nmap jq python3-pip && \
+curl -OL https://go.dev/dl/go1.22.1.linux-amd64.tar.gz && \
+sudo tar -C /usr/local -xzf go1.22.1.linux-amd64.tar.gz && \
+echo 'export PATH=$PATH:/usr/local/go/bin:$(go env GOPATH)/bin' >> ~/.bashrc && \
+source ~/.bashrc && \
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
+go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest && \
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+unzip awscliv2.zip && sudo ./aws/install && \
+sudo cp ~/go/bin/* /usr/local/bin/ && \
+echo -e "\033[0;32m[+] Worker Stack Installed. Subfinder, HTTPX, Naabu, and Nuclei are live.\033[0m"
+```
 
 ---
 
-# 🚀 Step 6: Run Your First Scan
-
-Trigger your webhook with a target IP.
-
-This will:
-- launch AWS worker  
-- run recon  
-- generate report  
-- store results  
+# 💾 Step 3: Create the Golden AMI
+1. **Configure AWS:** Run `aws configure` on the worker and input keys.
+2. **Add Script:** Move `recon-worker.sh` to `/usr/local/bin/` and `chmod +x`.
+3. **Freeze Image:** AWS Console -> Actions -> Image -> **Create Image**.
+4. **The ID:** Copy the `ami-xxxxxx` ID for your n8n workflow.
 
 ---
 
-# 📁 Reports Location
-
-docs/reports
-
----
-
-# ☁️ Step 7: Create Your Golden AMI (IMPORTANT)
-
-Instead of installing tools every time, you create a **pre-built AWS machine** with everything installed.
+# 🔄 Step 4: n8n Automation
+1. **Import:** Load `aws-recon-v5.json` into n8n.
+2. **Credentials:** Link your SSH (to C2) and AI (OpenRouter/Gemini) keys.
+3. **Launch:** Trigger the webhook with a target IP. The worker will launch, scan, upload to S3, and then **self-terminate** with `sudo shutdown -h now`.
 
 ---
 
-## 🔽 Install Required Tools (on your EC2 instance)
-
-After SSH-ing into your Ubuntu instance:
-
-### 1. Update system
-- update package lists  
-- upgrade existing packages  
-
-### 2. Install basic dependencies
-- git  
-- curl  
-- unzip  
-- build tools  
-
-### 3. Install Go (required for most recon tools)
-- download latest Go from official site  
-- extract it to /usr/local  
-- add it to your PATH  
-
-Verify Go works before continuing
-
----
-
-### 4. Install Recon Tools
-
-Install the following tools using Go:
-
-- subfinder  
-- httpx  
-- naabu  
-- nuclei  
-
-After installing:
-- move binaries to /usr/local/bin OR  
-- ensure your Go bin directory is in PATH  
-
----
-
-### 5. Install Nmap
-
-Use your package manager to install:
-- nmap  
-
----
-
-### 6. Install AWS CLI
-
-Install AWS CLI v2:
-- download official package  
-- install it system-wide  
-
-Then configure:
-- access key  
-- secret key  
-- region  
-
----
-
-### 7. Verify Everything
-
-Before moving on, check:
-- subfinder works  
-- httpx works  
-- naabu works  
-- nuclei works  
-- nmap works  
-- aws command works  
-
-If one fails, fix now (future you will thank you)
-
----
-
-## ⚙️ Add Your Worker Script
-
-1. Move recon-worker.sh into:
-
-/usr/local/bin
-
-2. Make it executable
-
-3. Edit it and replace:
-- BUCKET name  
-- REGION  
-
----
-
-## 🧪 Test It
-
-Run the script manually with a test target.
-
-Check:
-- scans run properly  
-- archive gets created  
-- upload to S3 works  
-
-If this step works, your infra is basically alive 🧠
-
----
-
-# 🧠 What recon-worker.sh Does
-
-This script:
-
-1. Takes a target  
-2. Finds subdomains  
-3. Checks which are alive  
-4. Extracts hosts  
-5. Scans ports  
-6. Runs service detection  
-7. Finds vulnerabilities  
-8. Compresses results  
-9. Uploads to S3  
-10. Terminates itself  
-
-Yes… it scans and then deletes itself like a hitman 💀
-
----
-
-# 💾 Step 8: Create the AMI
-
-Once everything is working:
-
-1. Go to AWS Console  
-2. Select your instance  
-3. Click “Create Image”  
-
-This becomes your **Golden AMI**
-
-Now every scan:
-- launches this pre-configured machine  
-- runs recon-worker.sh  
-- uploads results  
-- shuts down  
+# 🧠 What You Just Built
+You now have a **Cloud-Native Recon Engine**. You launch temporary AWS snipers that vanish after the job is done, leaving you with a perfectly formatted AI report in `docs/reports`.
 
 ---
 
 # 🧯 Troubleshooting
-
-Worker fails:
-- missing tools  
-- PATH issues  
-- script not executable  
-
-No upload:
-- wrong bucket name  
-- IAM permissions  
-
-Instance not terminating:
-- AWS CLI misconfigured  
-
----
-
-# 🧠 What You Built
-
-You now have:
-
-- auto-scaling recon workers  
-- prebuilt cloud images  
-- AI report generation  
-- full automation pipeline  
-
-This is basically a baby red-team infrastructure 😭
-
----
-
-# 🚀 Next Level Ideas
-
-- Auto-scale multiple workers  
-- Add Discord/Slack alerts  
-- Store results in a DB  
-- Build a dashboard  
-- Add more tools (amass, gau, ffuf, etc.)  
-
-You’re one step away from going full cyber villain
+- **No Command:** Run `source ~/.bashrc`.
+- **No Upload:** Check S3 Bucket permissions.
+- **No Termination:** Ensure AWS CLI is configured inside the AMI.
