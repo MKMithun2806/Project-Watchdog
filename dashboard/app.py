@@ -36,7 +36,7 @@ st.markdown("""
 
     /* Remove the annoying 'double scroll' by ensuring containers don't overflow */
     [data-testid="stVerticalBlock"] { gap: 1rem; }
-    
+
     /* Hide default Streamlit chrome bits */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -110,7 +110,7 @@ st.markdown("""
     }
 
     .pw-mini { color: #8b949e; font-size: 0.85rem; }
-    
+
     /* Fix for janky Streamlit buttons */
     .stButton button {
         border-radius: 8px !important;
@@ -140,11 +140,11 @@ def render_topbar():
             </div>
             <div class="pw-mini" style="margin-bottom: 1rem;">Recon dashboard • Session: {st.session_state.page}</div>
         """, unsafe_allow_html=True)
-        
+
         # Updated to 3 buttons
         b1, b2, b3, b_empty = st.columns([1, 1, 1, 2])
         with b1:
-            if st.button("???? TARGET CONTROL", use_container_width=True):
+            if st.button("🎯 TARGET CONTROL", use_container_width=True):
                 set_page("Target Control")
                 st.rerun()
         with b2:
@@ -190,7 +190,7 @@ if st.session_state.page == "Target Control":
             if target_input:
                 try:
                     safe_target = quote(target_input)
-                    webhook_url = f"http://YOUR_LOCAL_IP:PORT/webhook/scan?target={safe_target}"
+                    webhook_url = f"http://192.168.1.15:5678/webhook/scan?target={safe_target}"
                     response = requests.get(webhook_url, timeout=20)
                     st.toast("Pipeline Active" if response.status_code == 200 else "Uplink Failed")
                 except Exception:
@@ -198,9 +198,9 @@ if st.session_state.page == "Target Control":
 
         st.markdown("---")
         st.subheader("📝 Quick Notes")
-        notes_file = "PLACEHOLDER_PATH/notes.txt"
-        if not os.path.exists("PLACEHOLDER_PATH"): os.makedirs("PLACEHOLDER_PATH", exist_ok=True)
-        
+        notes_file = "/data/notes.txt"
+        if not os.path.exists("/data"): os.makedirs("/data", exist_ok=True)
+
         if "scratchpad_content" not in st.session_state:
             st.session_state.scratchpad_content = open(notes_file, "r").read() if os.path.exists(notes_file) else ""
 
@@ -222,7 +222,7 @@ if st.session_state.page == "Target Control":
 
         if PAYLOADS[selected_payload_name]:
             cp1, cp2 = st.columns(2)
-            with cp1: lhost = st.text_input("LHOST", value="YOUR_LOCAL_IP")
+            with cp1: lhost = st.text_input("LHOST", value="192.168.1.15")
             with cp2: lport = st.text_input("LPORT", value="4444")
 
             final_payload = PAYLOADS[selected_payload_name].replace("LHOST", lhost).replace("LPORT", lport)
@@ -232,7 +232,7 @@ if st.session_state.page == "Target Control":
 
     with col_reports:
         st.subheader("Intelligence Reports")
-        report_dir = "PLACEHOLDER_PATH/reports"
+        report_dir = "/reports"
 
         if os.path.exists(report_dir):
             files = [f for f in os.listdir(report_dir) if f.endswith(".md")]
@@ -254,15 +254,15 @@ if st.session_state.page == "Target Control":
 
 # --- PAGE: SHODAN SEARCH ---
 elif st.session_state.page == "Shodan Search":
-    api_key = "PLACEHOLDER_SHODAN_KEY"
+    api_key = "JAbrbxYBkbUeQqMT98SExPVc1R6GEARA"
     left, right = st.columns([1, 2], gap="large")
 
     with left:
         st.subheader("Parameters")
         if not api_key: st.warning("SHODAN_API_KEY NOT DETECTED")
-        
+
         query = st.text_input("QUERY", placeholder='e.g. "nginx port:443"')
-        
+
         with st.expander("Advanced Filters", expanded=True):
             country = st.text_input("Country (e.g. US)")
             product = st.text_input("Product (e.g. Apache)")
@@ -274,7 +274,7 @@ elif st.session_state.page == "Shodan Search":
 
         st.markdown("**Active Query:**")
         st.code(build if build else "null")
-        
+
         run_search = st.button("EXECUTE SEARCH", use_container_width=True, type="primary")
 
     with right:
@@ -297,7 +297,7 @@ elif st.session_state.page == "Shodan Search":
                                 <span class="pw-mini">{item.get('location', {}).get('city', 'Unknown City')}</span>
                             </div>
                             """, unsafe_allow_html=True)
-                            
+
                             c1, c2 = st.columns([1, 4])
                             with c1:
                                 if st.button(f"Copy IP", key=f"copy_{ip}_{port}"):
@@ -318,24 +318,24 @@ elif st.session_state.page == "Global Intel":
     with col_v:
         st.subheader("🔍 NVD Vulnerability Search")
         v_query = st.text_input("PRODUCT OR CVE", placeholder="e.g. log4j")
-        
+
         if v_query:
             try:
                 # --- NVD API KEY INTEGRATION ---
-                NVD_API_KEY = "PLACEHOLDER_NVD_KEY" 
-                
+                NVD_API_KEY = "your-api-key-here"
+
                 nvd_url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={v_query}"
-                headers = {"apiKey": NVD_API_KEY}
-                
+                headers = {"apiKey": "c24a7422-dcc9-4e30-99e0-7baae1ac68bb"}
+
                 nvd_res = requests.get(nvd_url, headers=headers, timeout=15).json()
-                
+
                 vulns = nvd_res.get("vulnerabilities", [])
                 if vulns:
                     for v in vulns[:5]:
                         c_data = v.get("cve", {})
                         cid = c_data.get("id")
                         desc = c_data.get("descriptions", [{}])[0].get("value", "N/A")
-                        
+
                         st.markdown(f"""
                         <div class="pw-hit">
                             <b style="color:#00ff41;">{cid}</b><br>
@@ -352,15 +352,15 @@ elif st.session_state.page == "Global Intel":
     with col_g:
         st.subheader("🗺️ Geo-IP Mapping")
         g_ip = st.text_input("IP ADDRESS", placeholder="8.8.8.8")
-        
+
         if g_ip:
             try:
                 res = requests.get(f"http://ip-api.com/json/{g_ip}").json()
-                
+
                 if res['status'] == 'success':
                     lat, lon = res.get('lat'), res.get('lon')
                     g_maps_url = f"https://www.google.com/maps?q={lat},{lon}"
-                    
+
                     st.markdown(f"""
                     <div class="pw-hit">
                         <b>ISP:</b> {res.get('isp')}<br>
@@ -369,7 +369,7 @@ elif st.session_state.page == "Global Intel":
                         <a href="{g_maps_url}" target="_blank" style="color:#00ff41; text-decoration:none;">📍 VIEW ON GOOGLE MAPS</a>
                     </div>
                     """, unsafe_allow_html=True)
-                    
+
                     if st.button("COPY COORDINATES"):
                         copy_to_clipboard(f"{lat}, {lon}")
                 else:
